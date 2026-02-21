@@ -62,6 +62,7 @@ ttyd is a simple command-line tool for sharing terminal over the web.
 
 ```
 USAGE:
+    ttyd
     ttyd [options] <command> [<arguments...>]
 
 OPTIONS:
@@ -95,6 +96,8 @@ OPTIONS:
     -v, --version           Print the version and exit
     -h, --help              Print this text and exit
 ```
+
+Running `ttyd` with no arguments starts an interactive setup wizard.
 
 Read the example usage on the [wiki](https://github.com/tsl0922/ttyd/wiki/Example-Usage).
 

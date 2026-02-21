@@ -5,6 +5,8 @@ ttyd 1 "September 2016" ttyd "User Manual"
   ttyd - Share your terminal over the web
 
 # SYNOPSIS
+  **ttyd**
+
   **ttyd** [options] \<command\> [\<arguments...\>]
 
 # DESCRIPTION
@@ -18,6 +20,8 @@ ttyd 1 "September 2016" ttyd "User Manual"
   - Run any custom command with options
   - Basic authentication support and many other custom options
   - Cross platform: macOS, Linux, FreeBSD/OpenBSD, OpenWrt/LEDE, Windows
+
+  Running `ttyd` with no arguments starts an interactive setup wizard.
 
 # OPTIONS
   -p, --port <port>

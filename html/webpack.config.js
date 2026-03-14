@@ -56,7 +56,7 @@ const baseConfig = {
                 removeComments: true,
                 collapseWhitespace: true,
             },
-            title: 'ttyd - Terminal',
+            title: 'oh-my-ttyd - Terminal',
             template: './template.html',
         }),
     ],

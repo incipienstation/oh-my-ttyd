@@ -22,7 +22,7 @@ const clientOptions = {
 } as ClientOptions;
 const termOptions = {
     fontSize: 13,
-    fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
+    fontFamily: 'D2Coding,Consolas,Liberation Mono,Menlo,Courier,monospace',
     theme: {
         foreground: '#d2d2d2',
         background: '#2b2b2b',

@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "ttyd",
+  "name": "oh-my-ttyd",
   "version": "1.0.0",
   "description": "Share your terminal over the web",
   "repository": {

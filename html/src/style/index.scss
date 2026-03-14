@@ -1,3 +1,19 @@
+@font-face {
+  font-family: D2Coding;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('webfont/D2Coding.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: D2Coding;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('webfont/D2CodingBold.woff2') format('woff2');
+}
+
 html,
 body {
   height: 100%;

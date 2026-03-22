@@ -27,7 +27,7 @@ else()
     set(CMAKE_C_STANDARD 99)
 endif()
 
-set(SOURCE_FILES src/utils.c src/pty.c src/protocol.c src/http.c src/server.c)
+set(SOURCE_FILES src/utils.c src/pty.c src/protocol.c src/http.c src/server.c src/wizard.c)
 
 include(FindPackageHandleStandardArgs)
 
@@ -92,3 +92,12 @@ include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT prog)
 install(FILES man/ttyd.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1" COMPONENT doc)
+
+option(TTYD_BUILD_TESTS "Build ttyd test harnesses" OFF)
+if(TTYD_BUILD_TESTS AND NOT WIN32)
+    add_executable(wizard_harness tests/wizard_harness.c src/wizard.c src/utils.c)
+    target_include_directories(wizard_harness PUBLIC ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(wizard_harness PUBLIC
+        TTYD_VERSION="${TTYD_VERSION}"
+    )
+endif()

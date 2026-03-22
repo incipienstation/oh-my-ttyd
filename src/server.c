@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 
 #include "utils.h"
+#include "wizard.h"
 
 #ifndef TTYD_VERSION
 #define TTYD_VERSION "unknown"
@@ -90,6 +91,7 @@ static void print_help() {
   // clang-format off
   fprintf(stderr, "ttyd is a tool for sharing terminal over the web\n\n"
           "USAGE:\n"
+          "    ttyd\n"
           "    ttyd [options] <command> [<arguments...>]\n\n"
           "VERSION:\n"
           "    %s\n\n"
@@ -130,6 +132,8 @@ static void print_help() {
           "    -d, --debug             Set log level (default: 7)\n"
           "    -v, --version           Print the version and exit\n"
           "    -h, --help              Print this text and exit\n\n"
+          "No-arg mode:\n"
+          "    Running `ttyd` with no arguments starts an interactive setup wizard.\n\n"
           "Visit https://github.com/tsl0922/ttyd to get more information and report bugs.\n",
           TTYD_VERSION
   );
@@ -301,9 +305,30 @@ static int calc_command_start(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+  struct wizard_output wizard_output = {0};
+  bool wizard_enabled = false;
+
   if (argc == 1) {
-    print_help();
-    return 0;
+    if (wizard_interactive(argv[0], &wizard_output) != 0) {
+      fprintf(stderr, "ttyd: interactive setup failed\n");
+      return 1;
+    }
+
+    switch (wizard_output.action) {
+      case WIZARD_ACTION_CANCEL:
+        wizard_output_free(&wizard_output);
+        return 0;
+      case WIZARD_ACTION_PRINT:
+        fprintf(stdout, "%s\n", wizard_output.command_preview);
+        wizard_output_free(&wizard_output);
+        return 0;
+      case WIZARD_ACTION_RUN:
+      default:
+        argc = wizard_output.argc;
+        argv = wizard_output.argv;
+        wizard_enabled = true;
+        break;
+    }
   }
 #ifdef _WIN32
   if (!conpty_init()) {
@@ -350,9 +375,11 @@ int main(int argc, char **argv) {
     switch (c) {
       case 'h':
         print_help();
+        if (wizard_enabled) wizard_output_free(&wizard_output);
         return 0;
       case 'v':
         printf("ttyd version %s\n", TTYD_VERSION);
+        if (wizard_enabled) wizard_output_free(&wizard_output);
         return 0;
       case 'd':
         debug_level = parse_int("debug", optarg);
@@ -519,6 +546,7 @@ int main(int argc, char **argv) {
         break;
       default:
         print_help();
+        if (wizard_enabled) wizard_output_free(&wizard_output);
         return -1;
     }
   }
@@ -527,6 +555,7 @@ int main(int argc, char **argv) {
 
   if (server->command == NULL || strlen(server->command) == 0) {
     fprintf(stderr, "ttyd: missing start command\n");
+    if (wizard_enabled) wizard_output_free(&wizard_output);
     return -1;
   }
 
@@ -593,12 +622,14 @@ int main(int argc, char **argv) {
   context = lws_create_context(&info);
   if (context == NULL) {
     lwsl_err("libwebsockets context creation failed\n");
+    if (wizard_enabled) wizard_output_free(&wizard_output);
     return 1;
   }
 
   struct lws_vhost *vhost = lws_create_vhost(context, &info);
   if (vhost == NULL) {
     lwsl_err("libwebsockets vhost creation failed\n");
+    if (wizard_enabled) wizard_output_free(&wizard_output);
     return 1;
   }
   int port = lws_get_vhost_listen_port(vhost);
@@ -629,6 +660,7 @@ int main(int argc, char **argv) {
 
   // cleanup
   server_free(server);
+  if (wizard_enabled) wizard_output_free(&wizard_output);
 
   return 0;
 }

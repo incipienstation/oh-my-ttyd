@@ -27,7 +27,7 @@ else()
     set(CMAKE_C_STANDARD 99)
 endif()
 
-set(SOURCE_FILES src/utils.c src/pty.c src/protocol.c src/http.c src/server.c)
+set(SOURCE_FILES src/utils.c src/pty.c src/clipboard_protocol.generated.c src/clipboard_upload.c src/protocol.c src/http.c src/server.c)
 
 include(FindPackageHandleStandardArgs)
 
@@ -92,3 +92,10 @@ include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT prog)
 install(FILES man/ttyd.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1" COMPONENT doc)
+
+include(CTest)
+if(BUILD_TESTING AND NOT WIN32)
+    add_executable(clipboard_upload_test tests/clipboard_upload_test.c src/clipboard_protocol.generated.c src/clipboard_upload.c)
+    target_include_directories(clipboard_upload_test PRIVATE src)
+    add_test(NAME clipboard_upload_test COMMAND clipboard_upload_test)
+endif()

@@ -16,6 +16,7 @@ ttyd is a simple command-line tool for sharing terminal over the web.
 - Built on top of [libuv](https://libuv.org) and [WebGL2](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API) for speed
 - Fully-featured terminal with [CJK](https://en.wikipedia.org/wiki/CJK_characters) and IME support
 - [ZMODEM](https://en.wikipedia.org/wiki/ZMODEM) ([lrzsz](https://ohse.de/uwe/software/lrzsz.html)) / [trzsz](https://trzsz.github.io) file transfer support
+- Optional clipboard image upload that inserts a secure server-side file path without interrupting the foreground terminal process
 - [Sixel](https://en.wikipedia.org/wiki/Sixel) image output support ([img2sixel](https://saitoha.github.io/libsixel) / [lsix](https://github.com/hackerb9/lsix))
 - SSL support based on [OpenSSL](https://www.openssl.org) / [Mbed TLS](https://github.com/Mbed-TLS/mbedtls)
 - Run any custom command with options
@@ -85,6 +86,9 @@ OPTIONS:
     -B, --browser           Open terminal with the default system browser
     -I, --index             Custom index.html path
     -b, --base-path         Expected base path for requests coming from a reverse proxy (eg: /mounted/here, max length: 128)
+        --clipboard-upload-dir PATH       Enable clipboard image uploads and store them under PATH
+        --clipboard-upload-max-size BYTES Maximum clipboard image size (default: 26214400)
+        --clipboard-upload-ttl SECONDS    Remove clipboard images older than this (default: 86400)
     -P, --ping-interval     Websocket ping interval(sec) (default: 5)
     -6, --ipv6              Enable IPv6 support
     -S, --ssl               Enable SSL
@@ -97,6 +101,17 @@ OPTIONS:
 ```
 
 Read the example usage on the [wiki](https://github.com/tsl0922/ttyd/wiki/Example-Usage).
+
+### Clipboard protocol generation
+
+Clipboard upload command IDs, defaults, supported MIME types, extensions, and file signatures are defined in
+`protocol/clipboard-upload.json`. After changing the manifest, regenerate the checked-in C and TypeScript contracts:
+
+```shell
+node scripts/generate-clipboard-protocol.mjs
+```
+
+CI runs the same command with `--check` and fails when generated contracts are stale.
 
 ## Browser Support
 

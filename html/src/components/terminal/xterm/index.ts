@@ -10,6 +10,8 @@ import { ImageAddon } from '@xterm/addon-image';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { OverlayAddon } from './addons/overlay';
 import { ZmodemAddon } from './addons/zmodem';
+import { ClipboardProtocol } from './clipboard-protocol.generated';
+import { encodeCommand, findClipboardImage, validateClipboardImage } from './clipboard';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -23,18 +25,7 @@ declare global {
     }
 }
 
-enum Command {
-    // server side
-    OUTPUT = '0',
-    SET_WINDOW_TITLE = '1',
-    SET_PREFERENCES = '2',
-
-    // client side
-    INPUT = '0',
-    RESIZE_TERMINAL = '1',
-    PAUSE = '2',
-    RESUME = '3',
-}
+const Command = ClipboardProtocol.commands;
 type Preferences = ITerminalOptions & ClientOptions;
 
 export type RendererType = 'dom' | 'canvas' | 'webgl';
@@ -45,6 +36,8 @@ export interface ClientOptions {
     disableResizeOverlay: boolean;
     enableZmodem: boolean;
     enableTrzsz: boolean;
+    enableClipboardImagePaste: boolean;
+    clipboardImageMaxSize: number;
     enableSixel: boolean;
     titleFixed?: string;
     isWindows: boolean;
@@ -71,9 +64,14 @@ function toDisposable(f: () => void): IDisposable {
     return { dispose: f };
 }
 
-function addEventListener(target: EventTarget, type: string, listener: EventListener): IDisposable {
-    target.addEventListener(type, listener);
-    return toDisposable(() => target.removeEventListener(type, listener));
+function addEventListener(
+    target: EventTarget,
+    type: string,
+    listener: EventListener,
+    options?: boolean | AddEventListenerOptions
+): IDisposable {
+    target.addEventListener(type, listener, options);
+    return toDisposable(() => target.removeEventListener(type, listener, options));
 }
 
 export class Xterm {
@@ -101,6 +99,9 @@ export class Xterm {
     private reconnect = true;
     private doReconnect = true;
     private closeOnDisconnect = false;
+    private clipboardImagePaste = false;
+    private clipboardImageMaxSize: number = ClipboardProtocol.defaults.maxUploadBytes;
+    private clipboardUpload?: { file: File; maxChunkSize: number };
 
     private writeFunc = (data: ArrayBuffer) => this.writeData(new Uint8Array(data));
 
@@ -110,6 +111,11 @@ export class Xterm {
     ) {}
 
     dispose() {
+        if (this.clipboardUpload && this.socket?.readyState === WebSocket.OPEN) {
+            this.socket.send(encodeCommand(Command.CLIPBOARD_UPLOAD_ABORT));
+        }
+        this.clipboardUpload = undefined;
+        this.clipboardImagePaste = false;
         for (const d of this.disposables) {
             d.dispose();
         }
@@ -164,9 +170,18 @@ export class Xterm {
         terminal.loadAddon(overlayAddon);
         terminal.loadAddon(clipboardAddon);
         terminal.loadAddon(webLinksAddon);
+        terminal.attachCustomKeyEventHandler(this.shouldProcessKeyEvent);
 
         terminal.open(parent);
         fitAddon.fit();
+    }
+
+    @bind
+    private shouldProcessKeyEvent(event: KeyboardEvent): boolean {
+        if (!this.clipboardImagePaste || event.type !== 'keydown') return true;
+
+        const isPasteShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'v';
+        return !isPasteShortcut;
     }
 
     @bind
@@ -201,6 +216,60 @@ export class Xterm {
         );
         register(addEventListener(window, 'resize', () => fitAddon.fit()));
         register(addEventListener(window, 'beforeunload', this.onWindowUnload));
+    }
+
+    @bind
+    private onClipboardPaste(event: ClipboardEvent) {
+        if (!this.clipboardImagePaste) return;
+        const file = findClipboardImage(event.clipboardData?.items);
+        if (!file) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (this.clipboardUpload) {
+            this.overlayAddon.showOverlay('An image upload is already in progress', 1800);
+            return;
+        }
+        const validationError = validateClipboardImage(file, this.clipboardImageMaxSize);
+        if (validationError) {
+            this.overlayAddon.showOverlay(validationError, 2200);
+            return;
+        }
+        if (this.socket?.readyState !== WebSocket.OPEN) {
+            this.overlayAddon.showOverlay('Cannot upload while disconnected', 1800);
+            return;
+        }
+
+        this.clipboardUpload = { file, maxChunkSize: ClipboardProtocol.defaults.maxChunkBytes };
+        const metadata = JSON.stringify({ size: file.size, mime: file.type });
+        this.socket.send(encodeCommand(Command.CLIPBOARD_UPLOAD_START, metadata));
+        this.overlayAddon.showOverlay('Preparing clipboard image…');
+    }
+
+    private async sendClipboardImage(upload: { file: File; maxChunkSize: number }) {
+        const { socket } = this;
+        if (socket?.readyState !== WebSocket.OPEN || this.clipboardUpload !== upload) return;
+        this.overlayAddon.showOverlay('Uploading clipboard image…');
+
+        try {
+            for (let offset = 0; offset < upload.file.size; offset += upload.maxChunkSize) {
+                while (socket.bufferedAmount > upload.maxChunkSize * 4) {
+                    await new Promise(resolve => window.setTimeout(resolve, 10));
+                    if (socket.readyState !== WebSocket.OPEN || this.clipboardUpload !== upload) return;
+                }
+                const chunk = new Uint8Array(
+                    await upload.file.slice(offset, offset + upload.maxChunkSize).arrayBuffer()
+                );
+                if (this.clipboardUpload !== upload) return;
+                socket.send(encodeCommand(Command.CLIPBOARD_UPLOAD_CHUNK, chunk));
+            }
+            if (this.clipboardUpload === upload) socket.send(encodeCommand(Command.CLIPBOARD_UPLOAD_FINISH));
+        } catch (error) {
+            console.error('[ttyd] clipboard image upload failed', error);
+            if (socket.readyState === WebSocket.OPEN) socket.send(encodeCommand(Command.CLIPBOARD_UPLOAD_ABORT));
+            this.clipboardUpload = undefined;
+            this.overlayAddon.showOverlay('Clipboard image upload failed', 2200);
+        }
     }
 
     @bind
@@ -354,13 +423,45 @@ export class Xterm {
                 this.title = textDecoder.decode(data);
                 document.title = this.title;
                 break;
-            case Command.SET_PREFERENCES:
-                this.applyPreferences({
+            case Command.SET_PREFERENCES: {
+                const serverPreferences = JSON.parse(textDecoder.decode(data)) as Partial<Preferences>;
+                const preferences = {
                     ...this.options.clientOptions,
-                    ...JSON.parse(textDecoder.decode(data)),
+                    ...serverPreferences,
                     ...this.parseOptsFromUrlQuery(window.location.search),
-                } as Preferences);
+                } as Preferences;
+                if (serverPreferences.clipboardImageMaxSize !== undefined) {
+                    preferences.clipboardImageMaxSize = serverPreferences.clipboardImageMaxSize;
+                }
+                this.applyPreferences(preferences);
                 break;
+            }
+            case Command.CLIPBOARD_UPLOAD_READY: {
+                const upload = this.clipboardUpload;
+                if (!upload) break;
+                const response = JSON.parse(textDecoder.decode(data)) as { maxChunkSize?: number };
+                if (response.maxChunkSize && response.maxChunkSize > 0) upload.maxChunkSize = response.maxChunkSize;
+                void this.sendClipboardImage(upload);
+                break;
+            }
+            case Command.CLIPBOARD_UPLOAD_RESULT: {
+                if (!this.clipboardUpload) break;
+                const response = JSON.parse(textDecoder.decode(data)) as { path?: string };
+                this.clipboardUpload = undefined;
+                if (!response.path || !response.path.startsWith('/')) {
+                    this.overlayAddon.showOverlay('Server returned an invalid image path', 2200);
+                    break;
+                }
+                this.sendData(`${response.path} `);
+                this.overlayAddon.showOverlay('Clipboard image ready', 1200);
+                break;
+            }
+            case Command.CLIPBOARD_UPLOAD_ERROR: {
+                const response = JSON.parse(textDecoder.decode(data)) as { message?: string };
+                this.clipboardUpload = undefined;
+                this.overlayAddon.showOverlay(response.message || 'Clipboard image upload failed', 2400);
+                break;
+            }
             default:
                 console.warn(`[ttyd] unknown command: ${cmd}`);
                 break;
@@ -370,6 +471,11 @@ export class Xterm {
     @bind
     private applyPreferences(prefs: Preferences) {
         const { terminal, fitAddon, register } = this;
+        this.clipboardImageMaxSize = prefs.clipboardImageMaxSize;
+        if (prefs.enableClipboardImagePaste && terminal.element) {
+            this.clipboardImagePaste = true;
+            register(addEventListener(terminal.element, 'paste', this.onClipboardPaste as EventListener, true));
+        }
         if (prefs.enableZmodem || prefs.enableTrzsz) {
             this.zmodemAddon = new ZmodemAddon({
                 zmodem: prefs.enableZmodem,
@@ -413,6 +519,12 @@ export class Xterm {
                     break;
                 case 'enableTrzsz':
                     if (value) console.log('[ttyd] trzsz enabled');
+                    break;
+                case 'enableClipboardImagePaste':
+                    if (value) console.log('[ttyd] clipboard image paste enabled');
+                    break;
+                case 'clipboardImageMaxSize':
+                    if (value) console.log(`[ttyd] clipboard image max size: ${value}`);
                     break;
                 case 'trzszDragInitTimeout':
                     if (value) console.log(`[ttyd] trzsz drag init timeout: ${value}`);

@@ -1,0 +1,55 @@
+{
+  "defaults": {
+    "maxUploadBytes": 26214400,
+    "ttlSeconds": 86400,
+    "maxChunkBytes": 262144
+  },
+  "commands": {
+    "serverToClient": {
+      "OUTPUT": "0",
+      "SET_WINDOW_TITLE": "1",
+      "SET_PREFERENCES": "2",
+      "CLIPBOARD_UPLOAD_READY": "3",
+      "CLIPBOARD_UPLOAD_RESULT": "4",
+      "CLIPBOARD_UPLOAD_ERROR": "5"
+    },
+    "clientToServer": {
+      "INPUT": "0",
+      "RESIZE_TERMINAL": "1",
+      "PAUSE": "2",
+      "RESUME": "3",
+      "CLIPBOARD_UPLOAD_START": "4",
+      "CLIPBOARD_UPLOAD_CHUNK": "5",
+      "CLIPBOARD_UPLOAD_FINISH": "6",
+      "CLIPBOARD_UPLOAD_ABORT": "7"
+    }
+  },
+  "imageTypes": [
+    {
+      "mime": "image/png",
+      "extension": "png",
+      "signatureVariants": [[{"offset": 0, "hex": "89504e470d0a1a0a"}]]
+    },
+    {
+      "mime": "image/jpeg",
+      "extension": "jpg",
+      "signatureVariants": [[{"offset": 0, "hex": "ffd8ff"}]]
+    },
+    {
+      "mime": "image/webp",
+      "extension": "webp",
+      "signatureVariants": [[
+        {"offset": 0, "hex": "52494646"},
+        {"offset": 8, "hex": "57454250"}
+      ]]
+    },
+    {
+      "mime": "image/gif",
+      "extension": "gif",
+      "signatureVariants": [
+        [{"offset": 0, "hex": "474946383761"}],
+        [{"offset": 0, "hex": "474946383961"}]
+      ]
+    }
+  ]
+}

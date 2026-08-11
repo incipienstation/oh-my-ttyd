@@ -4,11 +4,15 @@ on:
   push:
     paths:
     - ".github/workflows/frontend.yml"
-    - "html/*"
+    - "html/**"
+    - "protocol/**"
+    - "scripts/generate-clipboard-protocol.mjs"
   pull_request:
     paths:
     - ".github/workflows/frontend.yml"
-    - "html/*"
+    - "html/**"
+    - "protocol/**"
+    - "scripts/generate-clipboard-protocol.mjs"
 
 jobs:
   build:
@@ -20,6 +24,7 @@ jobs:
           node-version: 18
       - name: Run yarn install, check and build
         run: |
+          node ../scripts/generate-clipboard-protocol.mjs --check
           corepack enable
           corepack prepare yarn@stable --activate
           yarn install

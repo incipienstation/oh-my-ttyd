@@ -118,6 +118,18 @@ Cross platform: macOS, Linux, FreeBSD/OpenBSD, OpenWrt/LEDE, Windows
       Expected base path for requests coming from a reverse proxy (eg: /mounted/here, max length: 128)
 
 .PP
+--clipboard-upload-dir <path>
+      Enable clipboard image uploads and store them under this absolute path. The directory must be owned by the service user with mode 0700.
+
+.PP
+--clipboard-upload-max-size <bytes>
+      Maximum clipboard image size (default: 26214400)
+
+.PP
+--clipboard-upload-ttl <seconds>
+      Remove completed and partial clipboard image files older than this age (default: 86400)
+
+.PP
 -P, --ping-interval
       Websocket ping interval(sec) (default: 5)
 
@@ -189,6 +201,8 @@ ttyd has a mechanism to pass server side command-line arguments to the browser p
 \fB\fC-t enableTrzsz=true\fR: enable trzsz
 \[la]https://trzsz.github.io\[ra] file transfer support
 .IP \(bu 2
+\fB\fC-t enableClipboardImagePaste=true\fR: upload pasted PNG, JPEG, WebP, or GIF images and insert the saved path into the terminal (requires \fB\fC--clipboard-upload-dir\fR)
+.IP \(bu 2
 \fB\fC-t enableSixel=true\fR: enable Sixel
 \[la]https://en.wikipedia.org/wiki/Sixel\[ra] image output support (Usage
 \[la]https://saitoha.github.io/libsixel/\[ra])
@@ -202,6 +216,8 @@ ttyd has a mechanism to pass server side command-line arguments to the browser p
 \fB\fC-t unicodeVersion=11\fR: set xterm unicode support level (default: 11, use 6 to disable unicode addon)
 .IP \(bu 2
 \fB\fC-t trzszDragInitTimeout=3000\fR: set the timeout in milliseconds for initializing drag and drop files to upload. (default: 3000)
+.IP \(bu 2
+\fB\fC-t clipboardImageMaxSize=26214400\fR: client-side clipboard image size limit; the server-provided value takes precedence when uploads are enabled
 
 .RE
 

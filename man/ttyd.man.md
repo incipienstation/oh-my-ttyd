@@ -80,6 +80,15 @@ ttyd 1 "September 2016" ttyd "User Manual"
   -b, --base-path
       Expected base path for requests coming from a reverse proxy (eg: /mounted/here, max length: 128)
 
+  --clipboard-upload-dir <path>
+      Enable clipboard image uploads and store them under this absolute path. The directory must be owned by the service user with mode 0700.
+
+  --clipboard-upload-max-size <bytes>
+      Maximum clipboard image size (default: 26214400)
+
+  --clipboard-upload-ttl <seconds>
+      Remove completed and partial clipboard image files older than this age (default: 86400)
+
   -P, --ping-interval
       Websocket ping interval(sec) (default: 5)
 
@@ -125,12 +134,14 @@ ttyd has a mechanism to pass server side command-line arguments to the browser p
 - `-t disableReconnect=true`: prevent the terminal from reconnecting on connection error/close
 - `-t enableZmodem=true`: enable [ZMODEM](https://en.wikipedia.org/wiki/ZMODEM) / [lrzsz](https://ohse.de/uwe/software/lrzsz.html) file transfer support
 - `-t enableTrzsz=true`: enable [trzsz](https://trzsz.github.io) file transfer support
+- `-t enableClipboardImagePaste=true`: upload pasted PNG, JPEG, WebP, or GIF images and insert the saved path into the terminal (requires `--clipboard-upload-dir`)
 - `-t enableSixel=true`: enable [Sixel](https://en.wikipedia.org/wiki/Sixel) image output support ([Usage](https://saitoha.github.io/libsixel/))
 - `-t closeOnDisconnect=true`: close the terminal on disconnection, this will disable reconnect
 - `-t titleFixed=hello`: set a fixed title for the browser window
 - `-t fontSize=20`: change the font size of the terminal
 - `-t unicodeVersion=11`: set xterm unicode support level (default: 11, use 6 to disable unicode addon)
 - `-t trzszDragInitTimeout=3000`: set the timeout in milliseconds for initializing drag and drop files to upload. (default: 3000) 
+- `-t clipboardImageMaxSize=26214400`: client-side clipboard image size limit; the server-provided value takes precedence when uploads are enabled
 
 ## Advanced usage
 

@@ -7631,6 +7631,56 @@ __metadata:
   languageName: node
   linkType: hard
 
+"oh-my-ttyd@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "oh-my-ttyd@workspace:."
+  dependencies:
+    "@typescript-eslint/eslint-plugin": ^7.1.1
+    "@xterm/addon-canvas": ^0.7.0
+    "@xterm/addon-clipboard": ^0.1.0
+    "@xterm/addon-fit": ^0.10.0
+    "@xterm/addon-image": ^0.8.0
+    "@xterm/addon-unicode11": ^0.8.0
+    "@xterm/addon-web-links": ^0.11.0
+    "@xterm/addon-webgl": ^0.18.0
+    "@xterm/xterm": ^5.5.0
+    copy-webpack-plugin: ^12.0.2
+    css-loader: ^6.10.0
+    css-minimizer-webpack-plugin: ^6.0.0
+    decko: ^1.2.0
+    eslint: ^8.57.0
+    eslint-plugin-node: ^11.1.0
+    eslint-plugin-prettier: ^5.1.3
+    eslint-webpack-plugin: ^4.0.1
+    file-saver: ^2.0.5
+    gts: ^5.2.0
+    gulp: ^4.0.2
+    gulp-clean: ^0.4.0
+    gulp-gzip: ^1.4.2
+    gulp-inline-source: ^4.0.0
+    gulp-rename: ^2.0.0
+    html-webpack-plugin: ^5.6.0
+    mini-css-extract-plugin: ^2.8.1
+    preact: ^10.19.6
+    sass: ^1.71.1
+    sass-loader: ^14.1.1
+    scssfmt: ^1.0.7
+    style-loader: ^3.3.4
+    terser-webpack-plugin: ^5.3.10
+    through2: ^4.0.2
+    trzsz: ^1.1.5
+    ts-loader: ^9.5.1
+    typescript: ^5.3.3
+    util: ^0.12.5
+    webpack: ^5.90.3
+    webpack-cli: ^5.1.4
+    webpack-dev-server: ^5.0.2
+    webpack-merge: ^5.10.0
+    whatwg-fetch: ^3.6.20
+    zmodem.js: ^0.1.10
+  languageName: unknown
+  linkType: soft
+
 "on-finished@npm:2.4.1":
   version: 2.4.1
   resolution: "on-finished@npm:2.4.1"
@@ -10487,56 +10537,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ttyd@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "ttyd@workspace:."
-  dependencies:
-    "@typescript-eslint/eslint-plugin": ^7.1.1
-    "@xterm/addon-canvas": ^0.7.0
-    "@xterm/addon-clipboard": ^0.1.0
-    "@xterm/addon-fit": ^0.10.0
-    "@xterm/addon-image": ^0.8.0
-    "@xterm/addon-unicode11": ^0.8.0
-    "@xterm/addon-web-links": ^0.11.0
-    "@xterm/addon-webgl": ^0.18.0
-    "@xterm/xterm": ^5.5.0
-    copy-webpack-plugin: ^12.0.2
-    css-loader: ^6.10.0
-    css-minimizer-webpack-plugin: ^6.0.0
-    decko: ^1.2.0
-    eslint: ^8.57.0
-    eslint-plugin-node: ^11.1.0
-    eslint-plugin-prettier: ^5.1.3
-    eslint-webpack-plugin: ^4.0.1
-    file-saver: ^2.0.5
-    gts: ^5.2.0
-    gulp: ^4.0.2
-    gulp-clean: ^0.4.0
-    gulp-gzip: ^1.4.2
-    gulp-inline-source: ^4.0.0
-    gulp-rename: ^2.0.0
-    html-webpack-plugin: ^5.6.0
-    mini-css-extract-plugin: ^2.8.1
-    preact: ^10.19.6
-    sass: ^1.71.1
-    sass-loader: ^14.1.1
-    scssfmt: ^1.0.7
-    style-loader: ^3.3.4
-    terser-webpack-plugin: ^5.3.10
-    through2: ^4.0.2
-    trzsz: ^1.1.5
-    ts-loader: ^9.5.1
-    typescript: ^5.3.3
-    util: ^0.12.5
-    webpack: ^5.90.3
-    webpack-cli: ^5.1.4
-    webpack-dev-server: ^5.0.2
-    webpack-merge: ^5.10.0
-    whatwg-fetch: ^3.6.20
-    zmodem.js: ^0.1.10
-  languageName: unknown
-  linkType: soft
-
 "type-check@npm:^0.4.0, type-check@npm:~0.4.0":
   version: 0.4.0
   resolution: "type-check@npm:0.4.0"
@@ -11372,9 +11372,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zmodem.js@patch:zmodem.js@npm%3A0.1.10#./.yarn/patches/zmodem.js-npm-0.1.10-e5537fa2ed.patch::locator=ttyd%40workspace%3A.":
+"zmodem.js@patch:zmodem.js@npm%3A0.1.10#./.yarn/patches/zmodem.js-npm-0.1.10-e5537fa2ed.patch::locator=oh-my-ttyd%40workspace%3A.":
   version: 0.1.10
-  resolution: "zmodem.js@patch:zmodem.js@npm%3A0.1.10#./.yarn/patches/zmodem.js-npm-0.1.10-e5537fa2ed.patch::version=0.1.10&hash=064993&locator=ttyd%40workspace%3A."
+  resolution: "zmodem.js@patch:zmodem.js@npm%3A0.1.10#./.yarn/patches/zmodem.js-npm-0.1.10-e5537fa2ed.patch::version=0.1.10&hash=064993&locator=oh-my-ttyd%40workspace%3A."
   dependencies:
     crc-32: ^1.1.1
   checksum: ca52c5fad8a2e7df8aae678d50bf82701e94543547368470998c39af0a2e01908252d89a976c6748a89048dc332def688ad845082090035a18387c8611abe70b

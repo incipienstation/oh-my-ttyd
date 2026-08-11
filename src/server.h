@@ -2,19 +2,11 @@
 #include <stdbool.h>
 #include <uv.h>
 
+#include "clipboard_protocol.generated.h"
+#include "clipboard_upload.h"
 #include "pty.h"
 
-// client message
-#define INPUT '0'
-#define RESIZE_TERMINAL '1'
-#define PAUSE '2'
-#define RESUME '3'
 #define JSON_DATA '{'
-
-// server message
-#define OUTPUT '0'
-#define SET_WINDOW_TITLE '1'
-#define SET_PREFERENCES '2'
 
 // url paths
 struct endpoints {
@@ -52,6 +44,9 @@ struct pss_tty {
 
   pty_process *process;
   pty_buf_t *pty_buf;
+  clipboard_upload_t upload;
+  char *control_buf;
+  size_t control_len;
 
   int lws_close_status;
 };
@@ -81,6 +76,9 @@ struct server {
   bool exit_no_conn;       // whether exit on all clients disconnection
   char socket_path[255];   // UNIX domain socket path
   char terminal_type[30];  // terminal type to report
+  char *clipboard_upload_dir;
+  size_t clipboard_upload_max_size;
+  time_t clipboard_upload_ttl;
 
   uv_loop_t *loop;         // the libuv event loop
 };

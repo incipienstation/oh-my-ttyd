@@ -25,6 +25,7 @@ typedef struct {
 } clipboard_upload_t;
 
 void clipboard_upload_init(clipboard_upload_t *upload);
+bool clipboard_upload_parse_ttl(const char *value, time_t *ttl_seconds);
 bool clipboard_upload_prepare_directory(const char *directory, char *error, size_t error_size);
 void clipboard_upload_prune(const char *directory, time_t ttl_seconds);
 bool clipboard_upload_start(clipboard_upload_t *upload, const char *directory, size_t max_size,

@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +30,20 @@ void clipboard_upload_init(clipboard_upload_t *upload) {
 }
 
 bool clipboard_upload_active(const clipboard_upload_t *upload) { return upload->file_fd >= 0; }
+
+bool clipboard_upload_parse_ttl(const char *value, time_t *ttl_seconds) {
+  if (value == NULL || ttl_seconds == NULL || value[0] == '\0' || value[0] == '-') return false;
+
+  char *endptr;
+  errno = 0;
+  uintmax_t parsed = strtoumax(value, &endptr, 10);
+  if (errno != 0 || endptr == value || *endptr != '\0' || parsed == 0) return false;
+
+  time_t converted = (time_t)parsed;
+  if (converted <= 0 || (uintmax_t)converted != parsed) return false;
+  *ttl_seconds = converted;
+  return true;
+}
 
 #ifdef _WIN32
 

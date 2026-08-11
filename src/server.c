@@ -499,7 +499,10 @@ int main(int argc, char **argv) {
         }
         break;
       case OPT_CLIPBOARD_UPLOAD_TTL:
-        server->clipboard_upload_ttl = (time_t)parse_size("clipboard-upload-ttl", optarg);
+        if (!clipboard_upload_parse_ttl(optarg, &server->clipboard_upload_ttl)) {
+          fprintf(stderr, "ttyd: clipboard-upload-ttl must be a positive value representable by time_t\n");
+          return -1;
+        }
         break;
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
       case 'P': {

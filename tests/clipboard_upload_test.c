@@ -22,6 +22,19 @@ static const unsigned char webp[] = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', '
 static const unsigned char gif87[] = {'G', 'I', 'F', '8', '7', 'a'};
 static const unsigned char gif89[] = {'G', 'I', 'F', '8', '9', 'a'};
 
+static void test_ttl_parsing(void) {
+  time_t ttl = 0;
+  CHECK(clipboard_upload_parse_ttl("1", &ttl));
+  CHECK(ttl == 1);
+  CHECK(clipboard_upload_parse_ttl("86400", &ttl));
+  CHECK(ttl == 86400);
+  CHECK(!clipboard_upload_parse_ttl("0", &ttl));
+  CHECK(!clipboard_upload_parse_ttl("-1", &ttl));
+  CHECK(!clipboard_upload_parse_ttl("1s", &ttl));
+  CHECK(!clipboard_upload_parse_ttl("18446744073709551615", &ttl));
+  CHECK(!clipboard_upload_parse_ttl("18446744073709551616", &ttl));
+}
+
 static void test_format(const char *directory, const char *mime, const char *extension,
                         const unsigned char *data, size_t size, uint8_t id) {
   clipboard_upload_t upload;
@@ -110,6 +123,8 @@ static void test_prune(const char *directory) {
 }
 
 int main(void) {
+  test_ttl_parsing();
+
   char root[] = "/tmp/oh-my-ttyd-upload-test-XXXXXX";
   CHECK(mkdtemp(root) != NULL);
   char directory[CLIPBOARD_UPLOAD_PATH_MAX];

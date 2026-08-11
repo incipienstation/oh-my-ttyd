@@ -423,13 +423,19 @@ export class Xterm {
                 this.title = textDecoder.decode(data);
                 document.title = this.title;
                 break;
-            case Command.SET_PREFERENCES:
-                this.applyPreferences({
+            case Command.SET_PREFERENCES: {
+                const serverPreferences = JSON.parse(textDecoder.decode(data)) as Partial<Preferences>;
+                const preferences = {
                     ...this.options.clientOptions,
-                    ...JSON.parse(textDecoder.decode(data)),
+                    ...serverPreferences,
                     ...this.parseOptsFromUrlQuery(window.location.search),
-                } as Preferences);
+                } as Preferences;
+                if (serverPreferences.clipboardImageMaxSize !== undefined) {
+                    preferences.clipboardImageMaxSize = serverPreferences.clipboardImageMaxSize;
+                }
+                this.applyPreferences(preferences);
                 break;
+            }
             case Command.CLIPBOARD_UPLOAD_READY: {
                 const upload = this.clipboardUpload;
                 if (!upload) break;

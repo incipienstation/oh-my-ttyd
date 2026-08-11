@@ -180,6 +180,110 @@ static void wsi_output(struct lws *wsi, pty_buf_t *buf) {
   free(message);
 }
 
+static void queue_control_json(struct pss_tty *pss, char command, json_object *payload) {
+  const char *json = json_object_to_json_string_ext(payload, JSON_C_TO_STRING_PLAIN);
+  size_t json_len = strlen(json);
+  free(pss->control_buf);
+  pss->control_buf = xmalloc(LWS_PRE + json_len + 1);
+  char *message = pss->control_buf + LWS_PRE;
+  message[0] = command;
+  memcpy(message + 1, json, json_len);
+  pss->control_len = json_len + 1;
+  lws_callback_on_writable(pss->wsi);
+}
+
+static void queue_upload_error(struct pss_tty *pss, const char *message) {
+  clipboard_upload_abort(&pss->upload);
+  json_object *payload = json_object_new_object();
+  json_object_object_add(payload, "message", json_object_new_string(message));
+  queue_control_json(pss, CLIPBOARD_UPLOAD_ERROR, payload);
+  json_object_put(payload);
+}
+
+static void handle_upload_start(struct pss_tty *pss, const char *data, size_t len) {
+  if (!server->writable || server->clipboard_upload_dir == NULL) {
+    queue_upload_error(pss, "clipboard image upload is disabled");
+    return;
+  }
+  if (len == 0 || len > 512) {
+    queue_upload_error(pss, "invalid clipboard upload metadata");
+    return;
+  }
+
+  json_tokener *tokener = json_tokener_new();
+  json_object *payload = json_tokener_parse_ex(tokener, data, (int)len);
+  enum json_tokener_error parse_error = json_tokener_get_error(tokener);
+  json_tokener_free(tokener);
+  if (parse_error != json_tokener_success || payload == NULL || !json_object_is_type(payload, json_type_object)) {
+    if (payload != NULL) json_object_put(payload);
+    queue_upload_error(pss, "invalid clipboard upload metadata");
+    return;
+  }
+
+  json_object *size_object = NULL;
+  json_object *mime_object = NULL;
+  if (!json_object_object_get_ex(payload, "size", &size_object) ||
+      !json_object_is_type(size_object, json_type_int) ||
+      !json_object_object_get_ex(payload, "mime", &mime_object) ||
+      !json_object_is_type(mime_object, json_type_string)) {
+    json_object_put(payload);
+    queue_upload_error(pss, "clipboard upload metadata requires size and mime");
+    return;
+  }
+
+  int64_t declared_size = json_object_get_int64(size_object);
+  const char *mime = json_object_get_string(mime_object);
+  if (declared_size <= 0 || (uint64_t)declared_size > SIZE_MAX) {
+    json_object_put(payload);
+    queue_upload_error(pss, "invalid clipboard image size");
+    return;
+  }
+
+  uint8_t random_bytes[8];
+  if (lws_get_random(context, random_bytes, sizeof(random_bytes)) != (int)sizeof(random_bytes)) {
+    json_object_put(payload);
+    queue_upload_error(pss, "could not generate a secure image name");
+    return;
+  }
+
+  char error[256];
+  if (!clipboard_upload_start(&pss->upload, server->clipboard_upload_dir, server->clipboard_upload_max_size,
+                              (size_t)declared_size, mime, random_bytes, error, sizeof(error))) {
+    json_object_put(payload);
+    queue_upload_error(pss, error);
+    return;
+  }
+  json_object_put(payload);
+
+  json_object *ready = json_object_new_object();
+  json_object_object_add(ready, "maxChunkSize", json_object_new_int(CLIPBOARD_UPLOAD_MAX_CHUNK_SIZE));
+  queue_control_json(pss, CLIPBOARD_UPLOAD_READY, ready);
+  json_object_put(ready);
+}
+
+static void handle_upload_chunk(struct pss_tty *pss, const char *data, size_t len) {
+  char error[256];
+  if (!clipboard_upload_write(&pss->upload, data, len, error, sizeof(error))) queue_upload_error(pss, error);
+}
+
+static void handle_upload_finish(struct pss_tty *pss) {
+  char path[CLIPBOARD_UPLOAD_PATH_MAX];
+  char error[256];
+  size_t size = pss->upload.received_size;
+  if (!clipboard_upload_finish(&pss->upload, path, sizeof(path), error, sizeof(error))) {
+    queue_upload_error(pss, error);
+    return;
+  }
+
+  json_object *result = json_object_new_object();
+  json_object_object_add(result, "path", json_object_new_string(path));
+  json_object_object_add(result, "size", json_object_new_int64((int64_t)size));
+  queue_control_json(pss, CLIPBOARD_UPLOAD_RESULT, result);
+  json_object_put(result);
+  clipboard_upload_prune(server->clipboard_upload_dir, server->clipboard_upload_ttl);
+  lwsl_notice("clipboard image saved: %s (%zu bytes)\n", path, size);
+}
+
 static bool check_auth(struct lws *wsi, struct pss_tty *pss) {
   if (server->auth_header != NULL) {
     return lws_hdr_custom_copy(wsi, pss->user, sizeof(pss->user), server->auth_header, strlen(server->auth_header)) > 0;
@@ -233,6 +337,7 @@ int callback_tty(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
       pss->authenticated = false;
       pss->wsi = wsi;
       pss->lws_close_status = LWS_CLOSE_STATUS_NOSTATUS;
+      clipboard_upload_init(&pss->upload);
 
       if (server->url_arg) {
         while (lws_hdr_copy_fragment(wsi, buf, sizeof(buf), WSI_TOKEN_HTTP_URI_ARGS, n++) > 0) {
@@ -270,6 +375,18 @@ int callback_tty(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
       if (pss->lws_close_status > LWS_CLOSE_STATUS_NOSTATUS) {
         lws_close_reason(wsi, pss->lws_close_status, NULL, 0);
         return 1;
+      }
+
+      if (pss->control_buf != NULL) {
+        if (lws_write(wsi, (unsigned char *)pss->control_buf + LWS_PRE, pss->control_len, LWS_WRITE_BINARY) <
+            (int)pss->control_len) {
+          lwsl_err("write control message to WS\n");
+        }
+        free(pss->control_buf);
+        pss->control_buf = NULL;
+        pss->control_len = 0;
+        if (pss->pty_buf != NULL) lws_callback_on_writable(wsi);
+        break;
       }
 
       if (pss->pty_buf != NULL) {
@@ -325,6 +442,18 @@ int callback_tty(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
         case RESUME:
           pty_resume(pss->process);
           break;
+        case CLIPBOARD_UPLOAD_START:
+          handle_upload_start(pss, pss->buffer + 1, pss->len - 1);
+          break;
+        case CLIPBOARD_UPLOAD_CHUNK:
+          handle_upload_chunk(pss, pss->buffer + 1, pss->len - 1);
+          break;
+        case CLIPBOARD_UPLOAD_FINISH:
+          handle_upload_finish(pss);
+          break;
+        case CLIPBOARD_UPLOAD_ABORT:
+          clipboard_upload_abort(&pss->upload);
+          break;
         case JSON_DATA:
           if (pss->process != NULL) break;
           uint16_t columns = 0;
@@ -366,6 +495,8 @@ int callback_tty(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
       lwsl_notice("WS closed from %s, clients: %d\n", pss->address, server->client_count);
       if (pss->buffer != NULL) free(pss->buffer);
       if (pss->pty_buf != NULL) pty_buf_free(pss->pty_buf);
+      if (pss->control_buf != NULL) free(pss->control_buf);
+      clipboard_upload_abort(&pss->upload);
       for (int i = 0; i < pss->argc; i++) {
         free(pss->args[i]);
       }

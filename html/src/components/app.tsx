@@ -1,6 +1,7 @@
 import { h, Component } from 'preact';
 
 import { Terminal } from './terminal';
+import { ClipboardProtocol } from './terminal/xterm/clipboard-protocol.generated';
 
 import type { ITerminalOptions, ITheme } from '@xterm/xterm';
 import type { ClientOptions, FlowControl } from './terminal/xterm';
@@ -15,6 +16,8 @@ const clientOptions = {
     disableResizeOverlay: false,
     enableZmodem: false,
     enableTrzsz: false,
+    enableClipboardImagePaste: false,
+    clipboardImageMaxSize: ClipboardProtocol.defaults.maxUploadBytes,
     enableSixel: false,
     closeOnDisconnect: false,
     isWindows: false,

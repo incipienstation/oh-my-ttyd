@@ -6,6 +6,7 @@
 #include <libwebsockets.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +52,12 @@ static lws_retry_bo_t retry = {
 #endif
 
 // command line options
+enum {
+  OPT_CLIPBOARD_UPLOAD_DIR = 1000,
+  OPT_CLIPBOARD_UPLOAD_MAX_SIZE,
+  OPT_CLIPBOARD_UPLOAD_TTL,
+};
+
 static const struct option options[] = {{"port", required_argument, NULL, 'p'},
                                         {"interface", required_argument, NULL, 'i'},
                                         {"socket-owner", required_argument, NULL, 'U'},
@@ -62,6 +69,10 @@ static const struct option options[] = {{"port", required_argument, NULL, 'p'},
                                         {"cwd", required_argument, NULL, 'w'},
                                         {"index", required_argument, NULL, 'I'},
                                         {"base-path", required_argument, NULL, 'b'},
+                                        {"clipboard-upload-dir", required_argument, NULL, OPT_CLIPBOARD_UPLOAD_DIR},
+                                        {"clipboard-upload-max-size", required_argument, NULL,
+                                         OPT_CLIPBOARD_UPLOAD_MAX_SIZE},
+                                        {"clipboard-upload-ttl", required_argument, NULL, OPT_CLIPBOARD_UPLOAD_TTL},
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
                                         {"ping-interval", required_argument, NULL, 'P'},
 #endif
@@ -114,6 +125,9 @@ static void print_help() {
           "    -B, --browser           Open terminal with the default system browser\n"
           "    -I, --index             Custom index.html path\n"
           "    -b, --base-path         Expected base path for requests coming from a reverse proxy (eg: /mounted/here, max length: 128)\n"
+          "        --clipboard-upload-dir PATH       Enable clipboard image uploads and store them under PATH\n"
+          "        --clipboard-upload-max-size BYTES Maximum clipboard image size (default: 26214400)\n"
+          "        --clipboard-upload-ttl SECONDS    Remove clipboard images older than this (default: 86400)\n"
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
           "    -P, --ping-interval     Websocket ping interval(sec) (default: 5)\n"
 #endif
@@ -157,6 +171,11 @@ static void print_config() {
   if (server->exit_no_conn) lwsl_notice("  exit_no_conn: true\n");
   if (server->index != NULL) lwsl_notice("  custom index.html: %s\n", server->index);
   if (server->cwd != NULL) lwsl_notice("  working directory: %s\n", server->cwd);
+  if (server->clipboard_upload_dir != NULL) {
+    lwsl_notice("  clipboard upload directory: %s\n", server->clipboard_upload_dir);
+    lwsl_notice("  clipboard upload max size: %zu\n", server->clipboard_upload_max_size);
+    lwsl_notice("  clipboard upload ttl: %ld\n", (long)server->clipboard_upload_ttl);
+  }
   if (!server->writable) lwsl_warn("The --writable option is not set, will start in readonly mode\n");
 }
 
@@ -169,6 +188,8 @@ static struct server *server_new(int argc, char **argv, int start) {
   memset(ts, 0, sizeof(struct server));
   ts->client_count = 0;
   ts->sig_code = SIGHUP;
+  ts->clipboard_upload_max_size = CLIPBOARD_UPLOAD_DEFAULT_MAX_SIZE;
+  ts->clipboard_upload_ttl = CLIPBOARD_UPLOAD_DEFAULT_TTL;
   sprintf(ts->terminal_type, "%s", "xterm-256color");
   get_sig_name(ts->sig_code, ts->sig_name, sizeof(ts->sig_name));
   if (start == argc) return ts;
@@ -209,6 +230,7 @@ static void server_free(struct server *ts) {
   if (ts->auth_header != NULL) free(ts->auth_header);
   if (ts->index != NULL) free(ts->index);
   if (ts->cwd != NULL) free(ts->cwd);
+  if (ts->clipboard_upload_dir != NULL) free(ts->clipboard_upload_dir);
   free(ts->command);
   free(ts->prefs_json);
 
@@ -261,6 +283,17 @@ static int parse_int(char *name, char *str) {
     exit(EXIT_FAILURE);
   }
   return (int)val;
+}
+
+static size_t parse_size(char *name, char *str) {
+  char *endptr;
+  errno = 0;
+  unsigned long long val = strtoull(str, &endptr, 10);
+  if (errno != 0 || endptr == str || *endptr != '\0' || val > SIZE_MAX) {
+    fprintf(stderr, "ttyd: invalid value for %s: %s\n", name, str);
+    exit(EXIT_FAILURE);
+  }
+  return (size_t)val;
 }
 
 static int calc_command_start(int argc, char **argv) {
@@ -454,6 +487,20 @@ int main(int argc, char **argv) {
         sc(ws) sc(index) sc(token) sc(parent)
 #undef sc
       } break;
+      case OPT_CLIPBOARD_UPLOAD_DIR:
+        free(server->clipboard_upload_dir);
+        server->clipboard_upload_dir = strdup(optarg);
+        break;
+      case OPT_CLIPBOARD_UPLOAD_MAX_SIZE:
+        server->clipboard_upload_max_size = parse_size("clipboard-upload-max-size", optarg);
+        if (server->clipboard_upload_max_size == 0 || server->clipboard_upload_max_size > INT64_MAX) {
+          fprintf(stderr, "ttyd: clipboard-upload-max-size must be between 1 and %lld\n", (long long)INT64_MAX);
+          return -1;
+        }
+        break;
+      case OPT_CLIPBOARD_UPLOAD_TTL:
+        server->clipboard_upload_ttl = (time_t)parse_size("clipboard-upload-ttl", optarg);
+        break;
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
       case 'P': {
         int interval = parse_int("ping-interval", optarg);
@@ -521,6 +568,16 @@ int main(int argc, char **argv) {
         print_help();
         return -1;
     }
+  }
+  if (server->clipboard_upload_dir != NULL) {
+    char upload_error[256];
+    if (!clipboard_upload_prepare_directory(server->clipboard_upload_dir, upload_error, sizeof(upload_error))) {
+      fprintf(stderr, "ttyd: %s\n", upload_error);
+      return -1;
+    }
+    clipboard_upload_prune(server->clipboard_upload_dir, server->clipboard_upload_ttl);
+    json_object_object_add(client_prefs, "clipboardImageMaxSize",
+                           json_object_new_int64((int64_t)server->clipboard_upload_max_size));
   }
   server->prefs_json = strdup(json_object_to_json_string(client_prefs));
   json_object_put(client_prefs);
